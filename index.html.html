@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sphere to Cube Transformation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #progress {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="progress"></div>
+    <script type="module">
+        import * as THREE from './three.module.js';
+        import { OrbitControls } from './OrbitControls.js';
+
+        const startDate = new Date("1974-12-26");
+        const totalDays = 365 * 100; // Total number of days over 100 years
+        const particleCount = 360000; // One particle per day
+        const container = document.body;
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+
+        // Scene and Camera
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        // OrbitControls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // Smooth movement
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 3; // Minimum zoom distance
+        controls.maxDistance = 10; // Maximum zoom distance
+
+        // Particles
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3); // x, y, z for each particle
+        const sphereRadius = 2;
+
+        // Helper function to set initial sphere positions
+        function generateSpherePositions() {
+            for (let i = 0; i < particleCount; i++) {
+                const phi = Math.acos(2 * Math.random() - 1);
+                const theta = 2 * Math.PI * Math.random();
+
+                const x = sphereRadius * Math.sin(phi) * Math.cos(theta);
+                const y = sphereRadius * Math.sin(phi) * Math.sin(theta);
+                const z = sphereRadius * Math.cos(phi);
+
+                positions[i * 3] = x;
+                positions[i * 3 + 1] = y;
+                positions[i * 3 + 2] = z;
+            }
+        }
+
+        generateSpherePositions();
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const material = new THREE.PointsMaterial({ color: 0xffffff, size: 0.01 });
+        const particles = new THREE.Points(geometry, material);
+        scene.add(particles);
+
+        // Progress Calculation
+        function calculateProgress() {
+            const currentDate = new Date();
+            const elapsedDays = (currentDate - startDate) / (1000 * 60 * 60 * 24);
+            return Math.min(elapsedDays / totalDays, 1); // Cap at 1 for 100%
+        }
+
+        // Shape Transformation
+        function updateParticlePositions(progress) {
+            const positions = geometry.attributes.position.array;
+            for (let i = 0; i < particleCount; i++) {
+                const sphereX = positions[i * 3];
+                const sphereY = positions[i * 3 + 1];
+                const sphereZ = positions[i * 3 + 2];
+
+                // Transition to cube coordinates
+                const cubeX = Math.sign(sphereX) * sphereRadius * Math.pow(Math.abs(sphereX / sphereRadius), progress);
+                const cubeY = Math.sign(sphereY) * sphereRadius * Math.pow(Math.abs(sphereY / sphereRadius), progress);
+                const cubeZ = Math.sign(sphereZ) * sphereRadius * Math.pow(Math.abs(sphereZ / sphereRadius), progress);
+
+                // Interpolate between sphere and cube
+                positions[i * 3] = sphereX * (1 - progress) + cubeX * progress;
+                positions[i * 3 + 1] = sphereY * (1 - progress) + cubeY * progress;
+                positions[i * 3 + 2] = sphereZ * (1 - progress) + cubeZ * progress;
+            }
+            geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Animation Loop
+        function animate() {
+            const progress = calculateProgress();
+            updateParticlePositions(progress);
+            controls.update(); // Update OrbitControls
+            renderer.render(scene, camera);
+
+            // Update progress display
+            document.getElementById('progress').textContent = `Progress: ${(progress * 100).toFixed(2)}%`;
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // Handle Resizing
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    </script>
+</body>
+</html>
